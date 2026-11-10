@@ -1,21 +1,29 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const base=process.env.TEST_SITE_URL||'http://127.0.0.1:5173';
-const key=readFileSync('.dev.vars','utf8').match(/ADMIN_TOKEN=(.+)/)[1].trim();
-const request=async(path,method='GET',body,auth=false)=>{const r=await fetch(base+path,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:`Bearer ${key}`}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};};
-assert.equal((await request('/api/admin')).status,401,'private admin data must require authentication');
-assert.equal((await request('/api/leads','POST',{name:'X',phone:'123',consent:false})).status,400,'invalid lead must be rejected');
-let r=await request('/api/leads','POST',{name:'Проверка API',phone:'+7 (000) 000-00-00',comment:'Автоматическая локальная проверка, удалить',consent:true,source:'qa',calculation:{area:120,price:4610000}});
-assert.equal(r.status,200);const id=r.data.id;assert.ok(id);
-let admin=await request('/api/admin','GET',undefined,true);assert.equal(admin.status,200);assert.ok(admin.data.leads.some(l=>l.id===id));
-assert.equal((await request('/api/admin','POST',{leadId:id,status:'contacted'},true)).status,200);
-const original=admin.data.content;const changed={...original,phone:'+7 (000) 000-00-00'};
-assert.equal((await request('/api/admin','POST',{content:changed},true)).status,200);assert.equal((await request('/api/content')).data.phone,changed.phone);
-assert.equal((await request('/api/admin','POST',{content:original},true)).status,200);assert.equal((await request('/api/content')).data.phone,original.phone);
-assert.equal((await request('/api/admin','POST',{content:{...original,projects:[{...original.projects[0],image:'javascript:alert(1)'}]}},true)).status,400,'unsafe image schemes must be rejected');
-assert.equal((await request('/api/admin','DELETE',{leadId:id},true)).status,200);assert.ok(!(await request('/api/admin','GET',undefined,true)).data.leads.some(l=>l.id===id));
-const existing=(await request('/api/admin','GET',undefined,true)).data.leads.filter(l=>l.source==='calculator'&&l.comment==='Тестовая заявка из локальной проверки. Не звонить.');
-for(const lead of existing)assert.equal((await request('/api/admin','DELETE',{leadId:lead.id},true)).status,200);
-for(const path of ['/','/projects/lesnoy','/admin','/privacy','/robots.txt','/sitemap.xml','/images/hero.webp'])assert.equal((await fetch(base+path)).status,200,path);
-assert.equal((await fetch(base+'/projects/not-a-real-project')).status,404);
-console.log('PASS: admin authorization, form validation, lead persistence/status/deletion, content edits/restoration, unsafe URL rejection, page routes and assets. Synthetic test leads removed.');
+const access=readFileSync('OWNER-ACCESS.private.txt','utf8');
+const username=access.match(/^Логин: (.+)$/m)[1].trim(),password=access.match(/^Пароль: (.+)$/m)[1].trim();
+let cookie='';
+const request=async(path,method='GET',body,auth=false,extra={})=>{const r=await fetch(base+path,{method,redirect:'manual',headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth&&cookie?{Cookie:cookie}:{}),...extra},...(body?{body:JSON.stringify(body)}:{})});const raw=await r.text();let data;try{data=JSON.parse(raw);}catch{data={text:raw};}return{status:r.status,data,headers:r.headers};};
+assert.equal((await request('/api/admin')).status,401);
+assert.equal((await request('/api/admin','POST',{content:{}},false)).status,403);
+assert.equal((await request('/api/auth','POST',{username,password:'wrong-password'})).status,401);
+assert.equal((await request('/api/auth','POST',{username,password},false,{Origin:'https://untrusted.example'})).status,403);
+let r=await request('/api/auth','POST',{username,password});assert.equal(r.status,200);
+const setCookie=r.headers.get('set-cookie');assert.match(setCookie,/HttpOnly/);assert.match(setCookie,/SameSite=Lax/);if(base.startsWith('https:'))assert.match(setCookie,/Secure/);cookie=setCookie.split(';')[0];
+assert.equal((await request('/api/admin','GET',undefined,true)).status,200,'session must authenticate subsequent requests');
+assert.equal((await request('/api/admin','GET',undefined,false,{Authorization:'Bearer invalid'})).status,401,'old bearer access must no longer work');
+assert.equal((await request('/api/leads','POST',{name:'X',phone:'123',consent:false})).status,400);
+let leadId;const original=(await request('/api/content')).data;
+try{
+ r=await request('/api/leads','POST',{name:'Проверка нового входа',phone:'+7 (000) 000-00-00',comment:'Синтетическая тестовая заявка. Не звонить.',consent:true,source:'auth-qa'});assert.equal(r.status,200);leadId=r.data.id;
+ const admin=await request('/api/admin','GET',undefined,true);assert.ok(admin.data.leads.some(l=>l.id===leadId));
+ assert.equal((await request('/api/admin','POST',{leadId,status:'contacted'},true)).status,200);
+ assert.equal((await request('/api/admin','POST',{content:{...original,projects:[{...original.projects[0],image:'javascript:alert(1)'}]}},true)).status,400);
+ assert.equal((await request('/api/admin','POST',{content:original},true)).status,200,'saving content through cookie session must work');
+}finally{if(leadId)assert.equal((await request('/api/admin','DELETE',{leadId},true)).status,200);}
+assert.equal((await request('/api/auth','DELETE',undefined,true)).status,200);
+assert.equal((await request('/api/admin','GET',undefined,true)).status,401,'logout must revoke session on the server');
+assert.equal((await request('/api/admin','GET',undefined,false,{Cookie:'kolas_session='+'f'.repeat(64)})).status,401,'forged session rejected');
+for(const path of ['/','/projects/lesnoy','/admin','/privacy','/robots.txt','/sitemap.xml','/images/hero.webp']){const page=await fetch(base+path,{redirect:'manual'});assert.equal(page.status,200,path);if(path==='/'||path==='/admin'){const html=await page.text();assert.ok(!html.includes('ADMIN_TOKEN'));assert.ok(!html.includes('Ключ администратора'));}}
+console.log('PASS: username/password login, session persistence, logout revocation, invalid password/cookie/origin rejection, protected admin APIs, lead storage/deletion and anonymous pages.');

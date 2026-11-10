@@ -8,6 +8,13 @@
       "when": 1794276060252,
       "tag": "0000_zippy_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794278390028,
+      "tag": "0001_daffy_young_avengers",
+      "breakpoints": true
     }
   ]
 }
