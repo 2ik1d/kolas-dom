@@ -1,0 +1,13 @@
+export type Project={id:string;name:string;tag:string;area:number;rooms:number;floors:number;price:number;image:string;description:string};
+export type Work={title:string;caption:string;image:string;stage:'before'|'process'|'after'};
+export type Review={name:string;text:string;image:string;video:string};
+export type Content={phone:string;email:string;vk:string;telegram:string;metrika:string;legalName:string;legalDetails:string;hero:string;warmRate:number;turnkeyRate:number;projects:Project[];works:Work[];reviews:Review[]};
+export const defaults:Content={phone:'',email:'',vk:'',telegram:'',metrika:'',legalName:'КоЛАС Дом',legalDetails:'',hero:'/images/hero.webp',warmRate:36000,turnkeyRate:57000,projects:[
+{id:'lesnoy',name:'Лесной',tag:'Для жизни ближе к природе',area:96,rooms:3,floors:1,price:3456000,image:'/images/house-1.webp',description:'Светлая кухня-гостиная с выходом на террасу, две отдельные спальни и всё необходимое для спокойной загородной жизни.'},
+{id:'horizon',name:'Горизонт',tag:'Пространство для всей семьи',area:128,rooms:4,floors:1,price:4608000,image:'/images/house-2.webp',description:'Три спальни, просторная общая зона и большие окна. Общение и личное пространство в продуманном балансе.'},
+{id:'scandi',name:'Сканди',tag:'Скандинавский характер',area:156,rooms:5,floors:2,price:5616000,image:'/images/house-3.webp',description:'Два этажа для большой семьи: гостиная и кабинет внизу, тихая приватная зона наверху.'},
+{id:'weekend',name:'Уикенд',tag:'Маленький дом, большие планы',area:64,rooms:2,floors:1,price:2304000,image:'/images/house-4.webp',description:'Компактный загородный дом с уютной спальней, общей зоной и открытой террасой.'},
+{id:'cedar',name:'Кедр',tag:'Место для семейных традиций',area:184,rooms:6,floors:2,price:6624000,image:'/images/house-5.webp',description:'Большой дом с четырьмя спальнями, кабинетом и общей зоной для семейных встреч.'},
+{id:'silence',name:'Тишина',tag:'Своя точка равновесия',area:112,rooms:4,floors:1,price:4032000,image:'/images/house-6.webp',description:'Одноэтажный дом с тремя спальнями и открытой планировкой кухни и гостиной.'}],works:[],reviews:[]};
+export const money=(n:number)=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n)+' ₽';
+export function estimate(area:number,floors:number,foundation:string,kit:string,extras:string[],c:Content){return Math.round((area*(kit==='turnkey'?c.turnkeyRate:c.warmRate)*(floors===2?.96:1)+area*(foundation==='slab'?6500:foundation==='ribbon'?4200:2400)+(extras.includes('terrace')?360000:0)+(extras.includes('utilities')?450000:0)+(extras.includes('drainage')?180000:0))/10000)*10000;}

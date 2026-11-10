@@ -1,0 +1,1 @@
+export default function NotFound(){return <main className="legal wrap"><p className="eyebrow">КоЛАС ДОМ / 404</p><h1>Этой страницы пока нет</h1><p>Проект мог быть переименован. Посмотрите актуальный каталог домов.</p><a className="button amber" href="/#projects">Перейти к проектам →</a></main>;}
